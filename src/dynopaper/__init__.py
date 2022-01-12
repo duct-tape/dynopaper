@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import subprocess
@@ -7,12 +8,15 @@ import urllib.request
 
 SUNSET_API = "https://api.sunrise-sunset.org/json"
 LAT = "52.377956"
-LON = "4.897070"
+LNG = "4.897070"
 
 
-def get_times():
+def get_times(lat, lng):
+    """
+    Fetch Twilight Begin, Sunrise, Sunset, Twilight End times.
+    """
     timings = ["civil_twilight_begin", "sunrise", "sunset", "civil_twilight_end"]
-    url = "{}?lat={}&lng={}".format(SUNSET_API, LAT, LON)
+    url = "{}?lat={}&lng={}".format(SUNSET_API, lat, lng)
     with urllib.request.urlopen(url) as f:
         json_response = json.load(f)
 
@@ -20,9 +24,9 @@ def get_times():
             yield datetime.strptime(json_response["results"][key], "%I:%M:%S %p").time()
 
 
-
-def main(current_time):
-    twilight, sunrise, sunset, day_end = get_times()
+def main(current_time, lat, lng):
+    """Set Wallpaper for given time at given location."""
+    twilight, sunrise, sunset, day_end = get_times(lat, lng)
 
     if current_time >= twilight and current_time <= sunrise:
         image = 1
@@ -44,12 +48,29 @@ def main(current_time):
 
 
 if __name__ == "__main__":
-    current_time = datetime.now().time()
-    if len(sys.argv) == 2:
+    parser = argparse.ArgumentParser(description="Dynamically set wallpaper.")
+    parser.add_argument("time", nargs="?", help="Custom time")
+    parser.add_argument("--lat", nargs="?", help="Latitude", default=LAT)
+    parser.add_argument("--lng", nargs="?", help="Longitude", default=LNG)
+    parser.add_argument("--print-timing",
+                        help="Print timing and quit.",
+                        action=argparse.BooleanOptionalAction)
+
+    args = parser.parse_args()
+    if args.time is None:
+        current_time = datetime.now().time()
+    else:
         try:
-            current_time = datetime.strptime(sys.argv[1], "%H:%M").time()
+            current_time = datetime.strptime(args.time, "%H:%M").time()
         except ValueError as e:
             print("Incorrect time provided: {}".format(e))
             exit(1)
 
-    main(current_time)
+    if args.print_timing:
+        twilight, sunrise, sunset, down = list(get_times(args.lat, args.lng))
+        print("Twilight: {}".format(twilight))
+        print("Sunrise: {}".format(sunrise))
+        print("Sunset: {}".format(sunset))
+        print("Down: {}".format(down))
+    else:
+        main(current_time, lat=args.lat, lng=args.lng)
